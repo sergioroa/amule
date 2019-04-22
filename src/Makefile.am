@@ -154,6 +154,7 @@ core_sources = \
 	ExternalConn.cpp \
 	FriendList.cpp \
 	IPFilter.cpp \
+  IpToCountrySlow.cpp \
 	KnownFileList.cpp \
 	ListenSocket.cpp \
 	MuleUDPSocket.cpp \
