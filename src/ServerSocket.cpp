@@ -734,7 +734,7 @@ void CServerSocket::OnHostnameResolved(uint32 ip) {
 
 	m_IsSolving = false;
 	if (ip) {
-		if (theApp->ipfilter->IsFiltered(ip, true)) {
+		if (theApp->ipfilter->IsFiltered(ip, true) || theApp->ipfilter->IsBlacklisted(ip)) {
 			AddLogLineC(CFormat( _("Server IP %s (%s) is filtered.  Not connecting.") )
 				% Uint32toStringIP(ip) % cur_server->GetAddress() );
 #ifdef ASIO_SOCKETS

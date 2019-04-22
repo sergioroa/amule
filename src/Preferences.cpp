@@ -124,6 +124,7 @@ bool		CPreferences::s_confirmExit;
 bool		CPreferences::s_filterLanIP;
 bool		CPreferences::s_paranoidfilter;
 bool		CPreferences::s_IPFilterSys;
+bool		CPreferences::s_Blacklist;
 bool		CPreferences::s_onlineSig;
 uint16		CPreferences::s_OSUpdate;
 wxString	CPreferences::s_languageID;
@@ -1179,6 +1180,7 @@ void CPreferences::BuildItemList( const wxString& appdir )
 	NewCfgItem(IDC_IPFILTERURL,	(new Cfg_Str(  wxT("/eMule/IPFilterURL"), s_IPFilterURL, wxEmptyString )));
 	NewCfgItem(ID_IPFILTERLEVEL,	(MkCfg_Int( wxT("/eMule/FilterLevel"), s_filterlevel, 127 )));
 	NewCfgItem(IDC_IPFILTERSYS,	(new Cfg_Bool( wxT("/eMule/IPFilterSystem"), s_IPFilterSys, false )));
+	NewCfgItem(IDC_BLACKLIST,	(new Cfg_Bool( wxT("/eMule/Blacklist"), s_Blacklist, false )));
 
 	/**
 	 * Message Filter

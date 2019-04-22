@@ -439,6 +439,12 @@ public:
 	static bool		UseIPFilterSystem()		{ return s_IPFilterSys; }
 	static void		SetIPFilterSystem(bool val)	{ s_IPFilterSys = val; }
 
+	// Added by Sergio. Blacklist
+	static bool		UseBlacklist()		{ return s_Blacklist; }
+	static void		SetBlacklist(bool val)	{ s_Blacklist = val; }
+
+
+
 	// Source seeds On/Off
 	static bool		GetSrcSeedsOn()			{ return s_UseSrcSeeds; }
 	static void		SetSrcSeedsOn(bool val)		{ s_UseSrcSeeds = val; }
@@ -738,6 +744,9 @@ protected:
 	static bool	s_IPFilterAutoLoad;
 	static wxString s_IPFilterURL;
 	static bool	s_IPFilterSys;
+
+	// Added by Sergio - Bllacklist
+	static bool s_Blacklist;
 
 	// Kry - Source seeds on/off
 	static bool	s_UseSrcSeeds;

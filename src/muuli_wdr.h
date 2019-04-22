@@ -383,6 +383,7 @@ wxSizer *ED2K_Info( wxWindow *parent, bool call_fit = TRUE, bool set_sizer = TRU
 #define IDC_FILTERLAN 10276
 #define IDC_PARANOID 10277
 #define IDC_IPFILTERSYS 10278
+#define IDC_BLACKLIST 32000
 wxSizer *PreferencesSecurityTab( wxWindow *parent, bool call_fit = TRUE, bool set_sizer = TRUE );
 
 #define IDC_ONLINESIG 10279

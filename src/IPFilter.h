@@ -29,6 +29,9 @@
 #include <wx/event.h>	// Needed for wxEvent
 
 #include "Types.h"	// Needed for uint8, uint16 and uint32
+#include <map>
+#include "IP2Country.h"		// Needed for IP2Country
+#include "IpToCountrySlow.hpp"
 
 class CIPFilterEvent;
 
@@ -51,6 +54,8 @@ public:
 	 */
 	CIPFilter();
 
+	virtual ~CIPFilter();
+
 	/**
 	 * Checks if a IP is filtered with the current list and AccessLevel.
 	 *
@@ -61,6 +66,11 @@ public:
 	 * Note: IP2Test must be in anti-host order (BE on LE platform, LE on BE platform).
 	 */
 	bool	IsFiltered( uint32 IP2test, bool isServer = false );
+
+	/*
+	Added by Sergio for a list of blacklisted countries
+	*/
+	bool 	IsBlacklisted( uint32 IP2test );
 
 	/**
 	 * Returns the number of banned ranges.
@@ -116,6 +126,14 @@ private:
 	typedef std::vector<std::string> RangeNames;
 	RangeNames m_rangeNames;
 
+	// The countries (added by Sergio)
+	// typedef std::map<std::string, std::string> BlacklistedCountries;
+	typedef std::vector<std::string> BlacklistedCountries;
+	BlacklistedCountries m_blacklistedCountries;
+	// CIP2Country* m_IP2Country;
+	IpToCountrySlow m_iptc;
+	bool m_blacklistRead;
+
 	//! Mutex used to ensure thread-safety of this class
 	mutable wxMutex	m_mutex;
 
@@ -126,6 +144,7 @@ private:
 	bool m_connectToAnyServerWhenReady;
 	// should update be performed after filter is loaded ?
 	bool m_updateAfterLoading;
+	bool m_updateBlacklist;
 
 	friend class CIPFilterEvent;
 	friend class CIPFilterTask;

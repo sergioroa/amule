@@ -44,7 +44,8 @@
 #include "RangeMap.h"			// Needed for CRangeMap
 #include "ServerConnect.h"		// Needed for ConnectToAnyServer()
 #include "DownloadQueue.h"		// Needed for theApp->downloadqueue
-
+#include <fstream>
+#include <sstream>
 
 ////////////////////////////////////////////////////////////
 // CIPFilterEvent
@@ -59,11 +60,14 @@ DEFINE_EVENT_TYPE(MULE_EVT_IPFILTER_LOADED)
 class CIPFilterEvent : public wxEvent
 {
 public:
-	CIPFilterEvent(CIPFilter::RangeIPs rangeIPs, CIPFilter::RangeLengths rangeLengths, CIPFilter::RangeNames rangeNames)
+	CIPFilterEvent(CIPFilter::RangeIPs rangeIPs, CIPFilter::BlacklistedCountries blacklistedCountries, IpToCountrySlow iptc,
+				   CIPFilter::RangeLengths rangeLengths, CIPFilter::RangeNames rangeNames)
 		: wxEvent(-1, MULE_EVT_IPFILTER_LOADED)
 	{
 		// Physically copy the vectors, this will hopefully resize them back to their needed capacity.
 		m_rangeIPs = rangeIPs;
+		m_blacklistedCountries = blacklistedCountries;
+		std::swap(m_iptc, iptc);
 		m_rangeLengths = rangeLengths;
 		// This one is usually empty, and should always be swapped, not copied.
 		std::swap(m_rangeNames, rangeNames);
@@ -75,8 +79,10 @@ public:
 	}
 
 	CIPFilter::RangeIPs m_rangeIPs;
+	CIPFilter::BlacklistedCountries m_blacklistedCountries;
 	CIPFilter::RangeLengths m_rangeLengths;
 	CIPFilter::RangeNames m_rangeNames;
+	IpToCountrySlow m_iptc;
 };
 
 
@@ -110,6 +116,8 @@ public:
 private:
 	void Entry()
 	{
+
+
 		AddLogLineN(_("Loading IP filters 'ipfilter.dat' and 'ipfilter_static.dat'."));
 		if ( !LoadFromFile(thePrefs::GetConfigDir() + wxT("ipfilter.dat")) &&
 		     thePrefs::UseIPFilterSystem() ) {
@@ -126,8 +134,9 @@ private:
 			LoadFromFile(systemwideFile);
 		}
 
-
 		LoadFromFile(thePrefs::GetConfigDir() + wxT("ipfilter_static.dat"));
+
+		LoadBlacklistFromFile(thePrefs::GetConfigDir() + wxT("countryfilter.txt"));
 
 		uint8 accessLevel = thePrefs::GetIPFilterLevel();
 		uint32 size = m_result.size();
@@ -196,7 +205,7 @@ private:
 		// - some ranges from the map have to be split for the table
 		AddDebugLogLineN(logIPFilter, CFormat(wxT("Ranges in map: %d  blocked ranges in table: %d")) % size % m_rangeIPs.size());
 
-		CIPFilterEvent evt(m_rangeIPs, m_rangeLengths, m_rangeNames);
+		CIPFilterEvent evt(m_rangeIPs, m_blacklistedCountries, m_iptc,  m_rangeLengths, m_rangeNames);
 		wxPostEvent(m_owner, evt);
 	}
 
@@ -213,7 +222,7 @@ private:
 // is no need to keep them in memory when running a non-debug build.
 #ifdef __DEBUG__
 		//! Contains the user-description of the range.
-		std::string	Description;
+		std::string	Description;																																																																																																																																			
 #endif
 
 		//! The AccessLevel for this filter.
@@ -233,6 +242,12 @@ private:
 	wxEvtHandler*		m_owner;
 	// temporary map for filter generation
 	IPMap				m_result;
+
+	// The countries (added by Sergio)
+	// typedef std::map<std::string, std::string> BlacklistedCountries;
+	typedef std::vector<std::string> BlacklistedCountries;
+	BlacklistedCountries m_blacklistedCountries;
+	IpToCountrySlow m_iptc;
 
 	/**
 	 * Helper function.
@@ -334,6 +349,50 @@ private:
 
 		return filtercount;
 	}
+
+	/**
+	 * Loads a list of countries from the specified text file
+	 *
+	 * @return True if the file was loaded, false otherwise.
+	 **/
+	bool LoadBlacklistFromFile(const wxString& file)
+	{
+		const CPath path = CPath(file);
+
+		if (!path.FileExists() || TestDestroy()) {
+			return false;
+		}
+
+		const char* fileName = file.mb_str();
+
+		std::ifstream fileHandle;
+		fileHandle.open(fileName, std::ifstream::in);
+
+		std::string csvLine;
+		// read every line from the stream
+		while( getline(fileHandle, csvLine) )
+		{
+			std::istringstream csvStream(csvLine);
+			std::vector<std::string> csvColumn;
+			std::string csvElement;
+			// read every element from the line that is seperated by commas
+			// and put it into the map of strings
+			while( getline(csvStream, csvElement, ',') )
+			{
+				csvElement.erase(std::remove(csvElement.begin(), csvElement.end(), '"'), csvElement.end());
+				csvColumn.push_back(csvElement);
+				AddLogLineNS(csvElement);
+			}
+			// m_blacklistedCountries[csvColumn[0]] = csvColumn[1];
+			m_blacklistedCountries.push_back(csvColumn[1]);
+
+		}
+
+
+		return true;
+
+	}
+
 };
 
 
@@ -367,6 +426,8 @@ static bool CreateDummyFile(const wxString& filename, const wxString& text)
 
 
 CIPFilter::CIPFilter() :
+	// m_IP2Country(NULL),
+	m_blacklistRead(false),
 	m_ready(false),
 	m_startKADWhenReady(false),
 	m_connectToAnyServerWhenReady(false)
@@ -392,12 +453,23 @@ CIPFilter::CIPFilter() :
 		<< wxT("# place them in this file. aMule will not change this file.");
 
 	CreateDummyFile(staticDat, staticMsg);
-
+	
 	// First load currently available filter, so network connect is possible right after
 	// (in case filter download takes some time).
 	Reload();
+
+
 	// Check if update should be done only after that.
 	m_updateAfterLoading = thePrefs::IPFilterAutoLoad() && !thePrefs::IPFilterURL().IsEmpty();
+	m_updateBlacklist = thePrefs::UseBlacklist();
+}
+
+CIPFilter::~CIPFilter()
+{
+	// if (m_IP2Country != NULL)
+	// {
+	// 	delete m_IP2Country;
+	// }
 }
 
 
@@ -405,6 +477,19 @@ void CIPFilter::Reload()
 {
 	// We keep the current filter till the new one has been loaded.
 	CThreadScheduler::AddTask(new CIPFilterTask(this));
+
+
+	/* Update countries geodata */
+	AddLogLineNS("Sergio creating object");
+	// if (m_IP2Country == NULL)
+	// {
+	// 	m_IP2Country = new CIP2Country(thePrefs::GetConfigDir());
+	// }
+#ifdef ENABLE_IP2COUNTRY
+	// wxMutexLocker lock(m_mutex);
+ 	// m_IP2Country->Enable();
+#endif
+
 }
 
 
@@ -472,6 +557,33 @@ bool CIPFilter::IsFiltered(uint32 IPTest, bool isServer)
 	return false;
 }
 
+bool CIPFilter::IsBlacklisted(uint32 IPTest)
+{
+
+	if ((!thePrefs::UseBlacklist()) || !m_blacklistRead) {
+		return false;
+	}
+	wxMutexLocker lock(m_mutex);
+
+	// const CountryData& countryData = m_IP2Country->GetCountryData(Uint32toStringIP(IPTest));
+	IpAddressMapping countryData = m_iptc.GetCountry(IPTest);
+	AddLogLineNS(countryData.country);
+	auto it = std::find(m_blacklistedCountries.begin(),
+			   			m_blacklistedCountries.end(),
+						countryData.country);
+
+	AddLogLineNS(std::to_string(IPTest));
+
+	if (it == m_blacklistedCountries.end())
+	{
+		return false;
+	}
+	AddLogLineNS("is being black listed");
+	return true;
+	
+}
+
+
 
 void CIPFilter::Update(const wxString& strURL)
 {
@@ -485,6 +597,8 @@ void CIPFilter::Update(const wxString& strURL)
 		downloader->Create();
 		downloader->Run();
 	}
+
+
 }
 
 
@@ -523,7 +637,10 @@ void CIPFilter::OnIPFilterEvent(CIPFilterEvent& evt)
 {
 	{
 		wxMutexLocker lock(m_mutex);
+
 		std::swap(m_rangeIPs, evt.m_rangeIPs);
+		std::swap(m_blacklistedCountries, evt.m_blacklistedCountries);
+		// std::swap(m_iptc, evt.m_iptc);
 		std::swap(m_rangeLengths, evt.m_rangeLengths);
 		std::swap(m_rangeNames, evt.m_rangeNames);
 		m_ready = true;
@@ -560,6 +677,15 @@ void CIPFilter::OnIPFilterEvent(CIPFilterEvent& evt)
 		m_updateAfterLoading = false;
 		Update(thePrefs::IPFilterURL());
 	}
+
+	if (m_updateBlacklist)
+	{
+		wxMutexLocker lock(m_mutex);
+		m_updateBlacklist = false;
+		m_iptc.readCSV();
+		m_blacklistRead = true;
+	}
+
 }
 
 // File_checked_for_headers

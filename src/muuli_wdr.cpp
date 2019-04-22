@@ -2906,6 +2906,11 @@ wxSizer *PreferencesSecurityTab( wxWindow *parent, bool call_fit, bool set_sizer
     item25->SetToolTip( _("If there's no local ipfilter.dat found, allow usage of a systemwide ipfilter file.") );
     item8->Add( item25, 0, wxALIGN_CENTER_VERTICAL|wxLEFT, 5 );
 
+    wxCheckBox *item26 = new wxCheckBox( parent, IDC_BLACKLIST, _("Enable per country filtering"), wxDefaultPosition, wxDefaultSize, 0 );
+    item25->SetToolTip( _("Filer incoming and outcoming connections to forbid IP belonging to certain countries from the file ~/.aMule/countryfilter.txt.") );
+    item8->Add( item26, 0, wxALIGN_CENTER_VERTICAL|wxLEFT, 5 );
+
+
     item0->Add( item8, 0, wxGROW|wxALIGN_CENTER_VERTICAL, 5 );
 
     if (set_sizer)
